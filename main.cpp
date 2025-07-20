@@ -1,7 +1,9 @@
 #include <iostream> // cout, hex, dec
 #include <iomanip> // setw, setfill
 #include <fstream> // fstream
+#include <filesystem>
 #include <chrono> // high_resolution_clock, duration_cast, nanoseconds
+#include <cmath> // log
 
 /* procedure:
  - check if parameter is given
@@ -14,75 +16,93 @@
 // like a sliding window that shows current range of bytes of a file
 class viewer {
     std::fstream contents;
-    std::istreambuf_iterator<char> start;
-    std::istreambuf_iterator<char> end;
+    std::fstream::off_type page = 0;
     size_t page_size = 16;
+    int line_width = 2;
 public:
     viewer() = default;
-    viewer(const char* fname) {
+    explicit viewer(const char *fname) {
         // open in binary so it extracts by byte not character
         contents.open(fname,std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-        if (!contents)
+        if (!contents.is_open())
             return;
-
+        // figure out contents size when file exists
+        line_width = (int)std::log10(std::filesystem::file_size(fname));
     }
-    std::string view(){
-        // file does not exist, do not read
-        if (!contents)
-                return "";
-        auto res = "";
-        while (start != end){
-            ++start;
+    bool open(const char *fname){
+        contents.open(fname,std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+        if (!contents.is_open())
+            return false;
+        // figure out contents size when file exists
+        line_width = (int)std::log10(std::filesystem::file_size(fname));
+        return true;
+    }
+    bool scrollUp(){
+        if (page > 0) {
+            page -= 1;
+            return true;
         }
-        return res;
+        return false;
     }
-    [[nodiscard]] bool exists() const{
-        return (bool)contents;
+    bool scrollDown(){
+        page += 1;
+        contents.clear();
+        contents.seekg(page*16);
+        if (contents.tellg() == -1){
+            page -= 1;
+            return false;
+        }
+        return true;
+    }
+    void print() {
+        // file has nothing, do not read
+        if (!contents.is_open())
+            return;
+        // preparation
+        std::string line;
+        char current;
+        std::fstream::off_type i = 0, pages_passed = 0;
+        contents.clear();
+        contents.seekg(page*16);
+        std::cout << std::hex;
+        std::cout << std::setfill(' ') << std::setw(line_width) << page*16 << " : ";
+        std::cout << std::setfill('0');
+        for (; pages_passed < page_size && contents.get(current); i = (i + 1) % 16) {
+            auto c = +(unsigned char)current;
+            std::cout << std::setw(2) << c << ' ';
+            line += (c < 32 ? '.' : current);
+            if (i == 15) {
+                pages_passed += 1;
+                std::cout << "| " << std::dec << line << '\n';
+                if (pages_passed < page_size) {
+                    std::cout << std::hex;
+                    std::cout << std:: setfill(' ') << std::setw(line_width) << (page+pages_passed)*16 << " : ";
+                    std::cout << std::setfill('0');
+                }
+                line.clear();
+            }
+        }
+        // print remaining bytes on the right side
+        if (i > 0)
+            std::cout << std::string((16-i)*3,' ') << "| " << std::dec << line << '\n';
+    }
+    bool exists() const {
+        return contents.is_open();
     }
 };
-
-// something to measure speed with
-template <class F, class... A>
-std::chrono::nanoseconds measure(F func, A&&... args){
-    auto start = std::chrono::high_resolution_clock::now();
-    func(std::forward<A>(args)...);
-    auto end = std::chrono::high_resolution_clock::now();
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
-}
 
 int main(int argc, char* argv[]) {
     if (argc == 1) {
         std::cout << "No arguments given, pass filename to view contents.\n";
         return -1;
     }
-    std::fstream dump(argv[1], std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-    if (!dump) {
+    auto dump = viewer(argv[1]);
+    if (!dump.exists()) {
         std::cout << "File does not exist.\n";
         return -1;
     }
-
-    char current;
-    std::string line;
-    int pos = 0;
-    // good for one time use, but find a way to print without emptying fstream
-    std::cout << std::hex << std::setfill('0');
-    while (dump.get(current)) {
-        std::cout << std::setw(2) << +(unsigned char)current << ' ';
-        line += current;
-        if (++pos >= 16) {
-            std::cout << "| " << std::dec << line << '\n' << std::hex;
-            line.clear();
-            pos = 0;
-        }
-    }
-    // print remaining
-    auto print_string = [&](){
-        std::cout << std::string((16-pos)*3,' ') << "| " << std::dec << line << '\n';
-    };
-    auto print_setw = [&](){
-        std::cout << std::setfill(' ') << std::setw((16-pos)*3) << ' ' << "| " << std::dec << line << '\n';
-    };
-    std::cout << measure(print_string) << '\n';
-    std::cout << measure(print_setw) << '\n';
-    return 0;
+    dump.print();
+    std::cout << "scrolling down one page\n";
+    dump.scrollDown();
+    dump.print();
 }
