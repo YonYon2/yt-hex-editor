@@ -1,8 +1,7 @@
 #include <iostream> // cout, hex, dec
 #include <iomanip> // setw, setfill
 #include <fstream> // fstream
-#include <filesystem>
-#include <chrono> // high_resolution_clock, duration_cast, nanoseconds
+#include <filesystem> // file_size
 #include <cmath> // log
 
 /* procedure:
@@ -12,6 +11,10 @@
  - view contents between a range
  - quit by pressing File > Quit
 */
+
+#define JUMP(r, c) ("\033[r,cF")
+#define CLEAR "\033[1J"
+#define RESET "\033[1H"
 
 // like a sliding window that shows current range of bytes of a file
 class viewer {
