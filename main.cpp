@@ -3,6 +3,8 @@
 #include <fstream> // fstream
 #include <filesystem> // file_size
 #include <cmath> // log
+#include <SDL3/SDL.h>
+#include <fmt/core.h>
 
 /* procedure:
  - check if parameter is given
@@ -95,6 +97,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
+    fmt::print("fmt works!!{}\n",1);
     if (argc == 1) {
         std::cout << "No arguments given, pass filename to view contents.\n";
         return -1;
