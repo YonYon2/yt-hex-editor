@@ -3,6 +3,7 @@
 #include <fstream> // fstream
 #include <filesystem> // file_size
 #include <cmath> // log
+#include <windows.h>
 
 /* procedure:
  - check if parameter is given
@@ -15,6 +16,18 @@
 #define JUMP(r, c) ("\033[r,cF")
 #define CLEAR "\033[1J"
 #define RESET "\033[1H"
+
+void ShowConsoleCursor(bool showFlag)
+{
+    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    CONSOLE_CURSOR_INFO     cursorInfo;
+
+    GetConsoleCursorInfo(out, &cursorInfo);
+    cursorInfo.bVisible = showFlag; // set the cursor visibility
+    cursorInfo.dwSize = 1; // idk, someone says it crashes if you don't do this
+    SetConsoleCursorInfo(out, &cursorInfo);
+}
 
 // like a sliding window that shows current range of bytes of a file
 class viewer {
@@ -107,6 +120,42 @@ int main(int argc, char* argv[]) {
         std::cout << "File does not exist.\n";
         return -1;
     }
+    dump.print();
 
+    // Get the standard input handle.
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    if (hStdin == INVALID_HANDLE_VALUE) {
+        std::cerr << "Error getting standard input handle." << std::endl;
+        return 1;
+    }
+
+    DWORD cNumRead, cEvents = 0;//counts
+    INPUT_RECORD irInBuf[128];//input buffer for window handle
+
+    bool run = true;
+//    ShowConsoleCursor(false);
+    while (run) {
+        GetNumberOfConsoleInputEvents(hStdin, &cEvents);
+        // Wait for keyboard events
+        if (cEvents > 0) {
+            // Peek at the events in the buffer
+            PeekConsoleInput(hStdin, irInBuf, 128, &cNumRead);
+            for (DWORD i = 0; i < cNumRead; ++i) {
+                if (irInBuf[i].EventType == KEY_EVENT && irInBuf[i].Event.KeyEvent.bKeyDown) {
+                    // Handle key press
+                    auto key = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
+                    std::cout << '\r' << +key << "     ";
+                    if (key == 'q' || key == 'Q'){
+                        std::cout << "\nexiting..." << std::endl;
+                        run = false;
+                        break;
+                    }
+                }
+            }
+            // Remove the events from the buffer.
+            ReadConsoleInput(hStdin, irInBuf, cNumRead, &cNumRead);
+        }
+    }
+//    ShowConsoleCursor(true);
     return 0;
 }
