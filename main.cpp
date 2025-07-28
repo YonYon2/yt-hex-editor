@@ -3,8 +3,6 @@
 #include <fstream> // fstream
 #include <filesystem> // file_size
 #include <cmath> // log
-#include <SDL3/SDL.h>
-#include <fmt/core.h>
 
 /* procedure:
  - check if parameter is given
@@ -21,7 +19,7 @@
 // like a sliding window that shows current range of bytes of a file
 class viewer {
     std::fstream contents;
-    std::fstream::off_type page = 0;
+    size_t page = 0;
     size_t page_size = 16;
     int line_width = 2;
 public:
@@ -52,11 +50,14 @@ public:
     bool scrollDown(){
         page += 1;
         contents.clear();
-        contents.seekg(page*16);
+        contents.seekg(16*page*page_size-1);
         if (contents.tellg() == -1){
+            std::cout << "fuck";
             page -= 1;
             return false;
         }
+        contents.clear();
+        contents.seekg(16*page);
         return true;
     }
     void print() {
@@ -97,7 +98,6 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    fmt::print("fmt works!!{}\n",1);
     if (argc == 1) {
         std::cout << "No arguments given, pass filename to view contents.\n";
         return -1;
@@ -107,8 +107,6 @@ int main(int argc, char* argv[]) {
         std::cout << "File does not exist.\n";
         return -1;
     }
-    dump.print();
-    std::cout << "scrolling down one page\n";
-    dump.scrollDown();
-    dump.print();
+
+    return 0;
 }
