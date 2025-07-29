@@ -1,5 +1,10 @@
 # My Hex Editor
-Small hex editor for Windows Terminal that lets you view the bytes of a file in hexadecimal, scroll through the contents with the arrow keys, and lets you edit bytes and save the changes.
+Small hex editor for Windows Terminal that lets you view hexadecimal dump of a file, scroll through bytes in different pages with the arrow keys, and changes bytes and save to file.
+
+Modeling how `xxd` does it but allowing you to move and edit
+
 ## TODO
 - [x] Write feature TODO list
 - [ ] Make linux version
+- [ ] Scrolling 256 bytes at a time with CTRL+\<arrow key\>
+- [ ] Color characters

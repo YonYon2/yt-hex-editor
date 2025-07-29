@@ -5,14 +5,10 @@
 #include <cmath> // log
 #include <windows.h>
 
-/* procedure:
- - check if parameter is given
- - check filename exists
- - open file
- - view contents between a range
- - quit by pressing File > Quit
-*/
-
+#define UP "\033[1A"
+#define DOWN "\033[1B"
+#define LEFT "\033[1D"
+#define RIGHT "\033[1C"
 #define JUMP(r, c) ("\033[r,cF")
 #define CLEAR "\033[1J"
 #define RESET "\033[1H"
@@ -34,7 +30,8 @@ class viewer {
     std::fstream contents;
     size_t page = 0;
     size_t page_size = 16;
-    int line_width = 2;
+    int cursor_row = 0;
+    int cursor_col = 0;
 public:
     viewer() = default;
     explicit viewer(const char *fname) {
@@ -42,15 +39,11 @@ public:
         contents.open(fname,std::ios_base::in | std::ios_base::out | std::ios_base::binary);
         if (!contents.is_open())
             return;
-        // figure out contents size when file exists
-        line_width = (int)std::log10(std::filesystem::file_size(fname));
     }
     bool open(const char *fname){
         contents.open(fname,std::ios_base::in | std::ios_base::out | std::ios_base::binary);
         if (!contents.is_open())
             return false;
-        // figure out contents size when file exists
-        line_width = (int)std::log10(std::filesystem::file_size(fname));
         return true;
     }
     bool scrollUp(){
@@ -64,8 +57,8 @@ public:
         page += 1;
         contents.clear();
         contents.seekg(16*page*page_size-1);
-        if (contents.tellg() == -1){
-            std::cout << "fuck";
+        contents.get();
+        if (contents.fail()) {
             page -= 1;
             return false;
         }
@@ -83,27 +76,26 @@ public:
         std::fstream::off_type i = 0, pages_passed = 0;
         contents.clear();
         contents.seekg(page*16);
-        std::cout << std::hex;
-        std::cout << std::setfill(' ') << std::setw(line_width) << page*16 << " : ";
-        std::cout << std::setfill('0');
         for (; pages_passed < page_size && contents.get(current); i = (i + 1) % 16) {
+            if (i == 0)
+                std::cout << std::hex << std::setfill('0') << std::setw(8) << (page+pages_passed)*16 << ": ";
             auto c = +(unsigned char)current;
             std::cout << std::setw(2) << c << ' ';
             line += (c < 32 ? '.' : current);
             if (i == 15) {
                 pages_passed += 1;
                 std::cout << "| " << std::dec << line << '\n';
-                if (pages_passed < page_size) {
-                    std::cout << std::hex;
-                    std::cout << std:: setfill(' ') << std::setw(line_width) << (page+pages_passed)*16 << " : ";
-                    std::cout << std::setfill('0');
-                }
+//                if (pages_passed < page_size) {
+//                    std::cout << std::hex;
+//                    std::cout << std::setw(8) << (page+pages_passed)*16 << ": ";
+//                }
                 line.clear();
             }
         }
         // print remaining bytes on the right side
         if (i > 0)
             std::cout << std::string((16-i)*3,' ') << "| " << std::dec << line << '\n';
+        std::cout << '\n';
     }
     bool exists() const {
         return contents.is_open();
@@ -121,6 +113,8 @@ int main(int argc, char* argv[]) {
         return -1;
     }
     dump.print();
+    dump.scrollDown();
+    dump.print();
 
     // Get the standard input handle.
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
@@ -131,7 +125,8 @@ int main(int argc, char* argv[]) {
 
     DWORD cNumRead, cEvents = 0;//counts
     INPUT_RECORD irInBuf[128];//input buffer for window handle
-
+    std::cout << "erm";
+    enum Key { left = 37, up, right, down };
     bool run = true;
 //    ShowConsoleCursor(false);
     while (run) {
@@ -144,11 +139,19 @@ int main(int argc, char* argv[]) {
                 if (irInBuf[i].EventType == KEY_EVENT && irInBuf[i].Event.KeyEvent.bKeyDown) {
                     // Handle key press
                     auto key = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
-                    std::cout << '\r' << +key << "     ";
+                    //std::cout << '\r' << +key << "     ";
                     if (key == 'q' || key == 'Q'){
                         std::cout << "\nexiting..." << std::endl;
                         run = false;
                         break;
+                    } else if (key == Key::left) {
+                        std::cout << LEFT;
+                    } else if (key == Key::right) {
+                        std::cout << RIGHT;
+                    } else if (key == Key::up) {
+                        std::cout << UP;
+                    } else if (key == Key::down) {
+                        std::cout << DOWN;
                     }
                 }
             }
